@@ -62,8 +62,9 @@ class SSLSocket(socket):
                  ssl_version=PROTOCOL_SSLv23, ca_certs=None,
                  do_handshake_on_connect=True,
                  suppress_ragged_eofs=True,
+                 ciphers=None,
                  server_hostname=None,
-                 ciphers=None):
+                 _context=None):
         socket.__init__(self, _sock=sock)
 
         if PYPY:
@@ -81,7 +82,10 @@ class SSLSocket(socket):
             self._sslobj = None
         else:
             # yes, create the SSL object
-            if hasattr(_ssl, 'sslwrap'):
+            if _context:
+                self.context = _context
+                self._sslobj = self.context._wrap_socket(self._sock, server_side=server_side, ssl_sock=self)
+            elif hasattr(_ssl, 'sslwrap'):
                 if ciphers is None:
                     self._sslobj = _ssl.sslwrap(self._sock, server_side,
                                                 keyfile, certfile,
