@@ -305,6 +305,14 @@ if hasattr(os, 'fork'):
                     try:
                         return _waitpid(pid, options)
                     except OSError:
+                        try:
+                            return _waitpid(pid, options | _WNOHANG)
+                        except OSError:
+                            # libuv has a race condition because the signal
+                            # handler is a Python function, so the InterruptedError
+                            # is raised before the signal handler runs and calls the
+                            # child watcher
+                            pass
                         if pid in _watched_children and isinstance(_watched_children, tuple):
                             result = _watched_children[pid]
                             del _watched_children[pid]
