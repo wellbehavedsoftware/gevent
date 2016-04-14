@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 import gevent
+import gevent.core
 from gevent.event import Event
 from time import time
 from six import xrange
@@ -12,12 +13,13 @@ FUZZY = SMALL / 2
 gevent.signal(1, lambda: None)  # wouldn't work on windows
 
 from greentest import RUNNING_ON_APPVEYOR
-
+# We observe longer/jittery timeouts running on appveyor or running with libuv
+TIMEOUT_JITTERY = RUNNING_ON_APPVEYOR or hasattr(gevent.core, 'libuv')
 
 @contextmanager
 def expected_time(expected, fuzzy=None):
     if fuzzy is None:
-        if RUNNING_ON_APPVEYOR:
+        if TIMEOUT_JITTERY:
             # The noted timer jitter issues on appveyor
             fuzzy = expected * 5.0
         else:
@@ -28,7 +30,7 @@ def expected_time(expected, fuzzy=None):
     assert expected - fuzzy <= elapsed <= expected + fuzzy, 'Expected: %r; elapsed: %r; fuzzy %r' % (expected, elapsed, fuzzy)
 
 
-def no_time(fuzzy=(0.001 if not RUNNING_ON_APPVEYOR else 1.0)):
+def no_time(fuzzy=(0.001 if not TIMEOUT_JITTERY else 1.0)):
     return expected_time(0, fuzzy=fuzzy)
 
 
