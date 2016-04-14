@@ -271,6 +271,7 @@ if hasattr(os, 'fork'):
 
             .. versionadded:: 1.1b1
             """
+            # pylint: disable=too-many-return-statements
             # XXX Does not handle tracing children
             if pid <= 0:
                 # magic functions for multiple children.
