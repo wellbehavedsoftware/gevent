@@ -14,6 +14,9 @@ gevent.signal(1, lambda: None)  # wouldn't work on windows
 
 from greentest import RUNNING_ON_APPVEYOR
 # We observe longer/jittery timeouts running on appveyor or running with libuv
+# (libuv supports a minimum of 1ms timeouts, and that's exactly the value we
+# try to look for in no_time...but adding that up together with look overhead
+# means we usually exceed it slightly)
 TIMEOUT_JITTERY = RUNNING_ON_APPVEYOR or hasattr(gevent.core, 'libuv')
 
 @contextmanager
