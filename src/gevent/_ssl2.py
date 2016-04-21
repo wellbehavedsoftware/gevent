@@ -54,7 +54,9 @@ class SSLSocket(socket):
                  ssl_version=PROTOCOL_SSLv23, ca_certs=None,
                  do_handshake_on_connect=True,
                  suppress_ragged_eofs=True,
-                 ciphers=None):
+                 ciphers=None,
+                 server_hostname=None,
+                 _context=None):
         socket.__init__(self, _sock=sock)
 
         if PYPY:
@@ -72,23 +74,43 @@ class SSLSocket(socket):
             self._sslobj = None
         else:
             # yes, create the SSL object
-            if ciphers is None:
-                self._sslobj = _ssl.sslwrap(self._sock, server_side,
-                                            keyfile, certfile,
-                                            cert_reqs, ssl_version, ca_certs)
+            if _context:
+                self.context = _context
+                self._sslobj = self.context._wrap_socket(self._sock, server_side=server_side, ssl_sock=self)
+            elif hasattr(_ssl, 'sslwrap'):
+                if ciphers is None:
+                    self._sslobj = _ssl.sslwrap(self._sock, server_side,
+                                                keyfile, certfile,
+                                                cert_reqs, ssl_version, ca_certs)
+                else:
+                    self._sslobj = _ssl.sslwrap(self._sock, server_side,
+                                                keyfile, certfile,
+                                                cert_reqs, ssl_version, ca_certs,
+                                                ciphers)
             else:
-                self._sslobj = _ssl.sslwrap(self._sock, server_side,
-                                            keyfile, certfile,
-                                            cert_reqs, ssl_version, ca_certs,
-                                            ciphers)
+                self.context = __ssl__.SSLContext(ssl_version)
+                self.context.verify_mode = cert_reqs
+                if ca_certs:
+                    self.context.load_verify_locations(ca_certs)
+                if certfile:
+                    self.context.load_cert_chain(certfile, keyfile)
+                if ciphers:
+                    self.context.set_ciphers(ciphers)
+                self._sslobj = self.context._wrap_socket(self._sock, server_side=server_side, ssl_sock=self)
+
             if do_handshake_on_connect:
                 self.do_handshake()
+        if server_side and server_hostname:
+            raise ValueError("server_hostname can only be specified "
+                             "in client mode")
         self.keyfile = keyfile
         self.certfile = certfile
         self.cert_reqs = cert_reqs
         self.ssl_version = ssl_version
         self.ca_certs = ca_certs
         self.ciphers = ciphers
+        self.server_side = server_side
+        self.server_hostname = server_hostname
         self.do_handshake_on_connect = do_handshake_on_connect
         self.suppress_ragged_eofs = suppress_ragged_eofs
         self._makefile_refs = 0
@@ -368,6 +390,7 @@ class SSLSocket(socket):
                            ca_certs=self.ca_certs,
                            do_handshake_on_connect=self.do_handshake_on_connect,
                            suppress_ragged_eofs=self.suppress_ragged_eofs,
+                           server_hostname=self.server_hostname,
                            ciphers=self.ciphers)
 
         return sslobj, address
@@ -403,13 +426,14 @@ def wrap_socket(sock, keyfile=None, certfile=None,
                 server_side=False, cert_reqs=CERT_NONE,
                 ssl_version=PROTOCOL_SSLv23, ca_certs=None,
                 do_handshake_on_connect=True,
-                suppress_ragged_eofs=True, ciphers=None):
+                suppress_ragged_eofs=True, server_hostname=None, ciphers=None):
     """Create a new :class:`SSLSocket` instance."""
     return SSLSocket(sock, keyfile=keyfile, certfile=certfile,
                      server_side=server_side, cert_reqs=cert_reqs,
                      ssl_version=ssl_version, ca_certs=ca_certs,
                      do_handshake_on_connect=do_handshake_on_connect,
                      suppress_ragged_eofs=suppress_ragged_eofs,
+                     server_hostname=server_hostname,
                      ciphers=ciphers)
 
 
